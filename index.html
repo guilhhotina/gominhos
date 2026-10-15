@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <title>Gominhos</title>
+    <meta name="theme-color" content="#000000"/>
+    <meta name="description" content="Dispare gominhos, multiplique nos portais e derrube a fortaleza dos Azedinhos."/>
+    <meta property="og:title" content="Gominhos"/>
+    <meta property="og:image" content="cover.png"/>
+    <link rel="icon" type="image/png" href="cover.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <style>
+      *, *::after, *::before { touch-action: none; box-sizing: border-box; border: 0; padding: 0; margin: 0; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+      main { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+      #gameCanvas { max-width: 100vw; max-height: 100vh; width: 100vw; height: 56.25vw; }
+      @media (min-aspect-ratio: 16/9) { #gameCanvas { width: 177.78vh; height: 100vh; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+    </main>
+    <script type="module">
+      import { LuaFactory, LuaMultiReturn } from 'https://cdn.jsdelivr.net/npm/wasmoon@1.16.0/+esm'
+      window.LuaFactory = LuaFactory
+      window.LuaMultiReturn = LuaMultiReturn
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@gamely/core-native-html5@0.2.3" defer></script>
+    <script>
+      const sounds = {}
+      const images = [null]
+      const imageIds = {}
+      let imagesLoading = 0
+      const imageId = src => {
+        if (typeof src != 'string') return src
+        src = src.replace(/\.pkm$/, '.png')
+        if (imageIds[src]) return imageIds[src]
+        const el = new Image()
+        const id = images.push(el) - 1
+        imageIds[src] = id
+        imagesLoading++
+        el.onload = el.onerror = () => imagesLoading--
+        el.src = src
+        return id
+      }
+      const imageReady = src => {
+        const el = images[imageId(src)]
+        return el && el.complete && el.naturalWidth ? el : undefined
+      }
+      const gominhos = {
+        prepare: async hv => {
+          const ctx = document.querySelector('#gameCanvas').getContext('2d')
+          hv.backend.native_image_load = imageId
+          hv.backend.native_image_exists = src => !!imageReady(src)
+          hv.backend.native_image_loading_count = () => imagesLoading
+          hv.backend.native_image_draw = (src, x, y) => {
+            const el = imageReady(src)
+            if (el) ctx.drawImage(el, x, y)
+          }
+          hv.backend.native_draw_image = hv.backend.native_image_draw
+          hv.backend.native_image_mensure = src => {
+            const el = imageReady(src)
+            return el ? [el.naturalWidth, el.naturalHeight] : [0, 0]
+          }
+          hv.backend.native_image_unload = src => {
+            const id = typeof src == 'string' ? imageIds[src.replace(/\.pkm$/, '.png')] : src
+            if (!images[id]) return
+            delete imageIds[images[id].getAttribute('src')]
+            images[id] = null
+          }
+          const getEnv = hv.backend.native_system_get_env
+          hv.backend.native_system_get_env = name => getEnv(name) ?? undefined
+          hv.backend.native_storage_get = (key, save) => { save(localStorage.getItem(key) ?? '') }
+          hv.backend.native_storage_set = (key, value) => { localStorage.setItem(key, value) }
+          hv.backend.native_text_font_face = (name, src) => {
+            new FontFace(name, `url(${src})`).load().then(font => document.fonts.add(font))
+          }
+          hv.backend.native_audio_sfx_play = (channel, src) => {
+            const audio = sounds[channel] ?? (sounds[channel] = new Audio())
+            audio.src = src
+            audio.currentTime = 0
+            audio.play().catch(() => {})
+          }
+        },
+        install: async hv => {
+          const manifest = await (await fetch('gfx/manifest.lua')).text()
+          await hv.vm.wasmoon.mountFile('gfx/manifest.lua', manifest)
+        },
+        startup: async () => {}
+      }
+      document.addEventListener('DOMContentLoaded', async () => {
+        window.gly = await CoreNativeHtml5()
+          .setElementRoot('main')
+          .setElementCanvas('#gameCanvas')
+          .addLibrary('wasmoon', window.LuaFactory, window.LuaMultiReturn)
+          .addLibrary('fengari-or-wasmoon-check')
+          .addLibrary('gominhos', gominhos)
+          .addLibrary('runtime', {unfocus_pause: true})
+          .addLibrary('gamepad')
+          .addLibrary('keyboard')
+          .addLibrary('player-html5')
+          .setEngine('main.lua')
+          .setGame('game.lua')
+          .build()
+      })
+    </script>
+  </body>
+</html>
