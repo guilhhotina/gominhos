@@ -2520,7 +2520,7 @@ local function init(data, std)
   OSX, OSY = W * 0.035, H * 0.045
   PADL, PADT, PADB = u(16) + floor(OSX + 0.5), u(16) + floor(OSY + 0.5), u(18) + floor(OSY + 0.5)
 
-  rnd = newRng(std.math.random(1, 2147483646) + std.milis)
+  rnd = newRng(std.math.random(1, 2147483646) + floor(std.milis))
   tintCache = {}
   resetTextCaches()
   curCol, GA, clipOn = -1, 1, false
