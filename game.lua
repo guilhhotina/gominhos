@@ -505,10 +505,10 @@ local function zIndexer(list)
   end
 end
 
-function scene.load(std, root)
+function scene.load(std, root, manifest)
   GFX = root .. 'gfx/'
   imgLoad, imgDraw, imgUnload, imgMensure = std.image.load, std.image.draw, std.image.unload, std.image.mensure
-  M = assert(loadfile(GFX .. 'manifest.lua'))()
+  M = assert(manifest and load(manifest) or loadfile(GFX .. 'manifest.lua'))()
   PX = M.scale
   for _, key in ipairs({'mob', 'champ', 'enemy', 'brute', 'gate', 'spinner'}) do ZI[key] = zIndexer(M.buckets[key]) end
   for i, sk in ipairs(SKINS) do MOBSET[i] = M.mobs[sk.id] end
@@ -2529,7 +2529,7 @@ local function init(data, std)
 
   buildPalettes()
 
-  scene.load(std, scene.root)
+  scene.load(std, scene.root, data.manifest)
   scene.camera_fit(W, H)
 
   for k in pairs(G) do G[k] = nil end
